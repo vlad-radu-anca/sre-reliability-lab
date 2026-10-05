@@ -16,8 +16,11 @@ on:
 permissions:
   contents: read
 
+# One run per branch and platform ref: a newer push replaces an older run, but
+# a manual run against a gitops-platform branch is not cancelled by a routine
+# run against main.
 concurrency:
-  group: gameday-${{ github.ref }}
+  group: gameday-${{ github.ref }}-${{ inputs.platform_ref || 'main' }}
   cancel-in-progress: true
 
 env:
