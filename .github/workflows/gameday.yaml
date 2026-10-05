@@ -45,7 +45,7 @@ jobs:
       - name: Raise vm.max_map_count for Elasticsearch
         run: sudo sysctl -w vm.max_map_count=262144
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5.0.1
         with:
           version: ${{ env.HELM_VERSION }}
 
