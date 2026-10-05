@@ -1,0 +1,86 @@
+# SLOs for podinfo in production, as seen through the platform gateway.
+#
+# Source for `make generate`, which runs Sloth and writes the Prometheus rules
+# to manifests/slo-rules/. Edit this file, never the generated one; CI fails if
+# the two disagree.
+#
+# Three SLOs, because no single signal sees every failure. Measured on the
+# platform, Envoy's per-service counters only record responses that came back
+# from podinfo: when Envoy answers on its own (no healthy backend, a fault at
+# the gateway) the request is missing from them entirely. The probe covers that
+# blind spot; the request-based SLOs cover what a probe every 10 seconds is too
+# coarse to see. See docs/decisions/0001-three-slis.md.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: podinfo-prod
+  namespace: sre
+spec:
+  service: podinfo
+  labels:
+    environment: prod
+    owner: platform
+  slos:
+    - name: availability
+      objective: 99.5
+      description: Synthetic requests through the gateway succeed. Catches outages, including errors the gateway generates itself.
+      sli:
+        raw:
+          # Averaged across probe series, so the result carries no probe
+          # labels and the alerts look the same as the request-based ones.
+          errorRatioQuery: |
+            1 - avg(avg_over_time(probe_success{job="probe-podinfo-prod"}[{{.window}}]))
+      alerting:
+        name: PodinfoProdUnavailable
+        annotations:
+          summary: podinfo in prod is failing synthetic checks through the gateway.
+          runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-availability.md
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket
+
+    - name: errors
+      objective: 99.5
+      description: Requests that reach podinfo do not fail with a 5xx.
+      sli:
+        events:
+          errorQuery: sum(rate(envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="5"}[{{.window}}]))
+          totalQuery: sum(rate(envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me"}[{{.window}}]))
+      alerting:
+        name: PodinfoProdErrors
+        annotations:
+          summary: podinfo in prod is returning server errors.
+          runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-errors.md
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket
+
+    - name: latency
+      objective: 99
+      description: Requests complete within 250 ms, measured at the gateway.
+      sli:
+        events:
+          # Envoy's latency histogram is in milliseconds. Slow requests are all
+          # requests minus those in the 250 ms bucket.
+          errorQuery: |
+            sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[{{.window}}]))
+            -
+            sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[{{.window}}]))
+          totalQuery: sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[{{.window}}]))
+      alerting:
+        name: PodinfoProdSlow
+        annotations:
+          summary: podinfo in prod is responding slowly.
+          runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-latency.md
+        pageAlert:
+          labels:
+            severity: page
+        ticketAlert:
+          labels:
+            severity: ticket

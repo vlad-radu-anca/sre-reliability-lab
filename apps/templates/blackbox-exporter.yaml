@@ -1,0 +1,45 @@
+# Runs the synthetic checks behind the availability SLO. Each module describes
+# one check; the Probe in manifests/sre decides how often it runs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: blackbox-exporter
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-blackbox-exporter
+    targetRevision: 11.19.1
+    helm:
+      releaseName: blackbox-exporter
+      valuesObject:
+        fullnameOverride: blackbox-exporter
+        config:
+          modules:
+            # podinfo in prod, requested through the platform gateway with the
+            # hostname users use. Only a 200 counts as success.
+            podinfo_prod:
+              prober: http
+              timeout: 5s
+              http:
+                preferred_ip_protocol: ip4
+                headers:
+                  Host: podinfo-prod.localtest.me
+                valid_status_codes: [200]
+                no_follow_redirects: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sre
+  syncPolicy:
+    {{- include "sre.syncPolicy" . | nindent 4 }}

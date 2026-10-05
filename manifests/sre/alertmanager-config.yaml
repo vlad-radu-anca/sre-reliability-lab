@@ -1,0 +1,42 @@
+# Routes SLO alerts by severity. Pages go out immediately and repeat hourly
+# while they fire; tickets are batched and repeat daily. Both receivers point
+# at the alert sink, which stands in for a pager and a ticket queue: it logs
+# every notification, so a game day can show what was actually delivered.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: slo-routing
+  namespace: sre
+spec:
+  route:
+    receiver: ticket
+    groupBy: [alertname, sloth_slo, severity]
+    # Only SLO alerts. The platform's own alerts keep their existing routing.
+    matchers:
+      - name: sloth_id
+        matchType: =~
+        value: .+
+    routes:
+      - receiver: page
+        matchers:
+          - name: severity
+            value: page
+        groupWait: 10s
+        groupInterval: 1m
+        repeatInterval: 1h
+      - receiver: ticket
+        matchers:
+          - name: severity
+            value: ticket
+        groupWait: 5m
+        groupInterval: 30m
+        repeatInterval: 24h
+  receivers:
+    - name: page
+      webhookConfigs:
+        - url: http://alert-sink.sre.svc:8080/page
+          sendResolved: true
+    - name: ticket
+      webhookConfigs:
+        - url: http://alert-sink.sre.svc:8080/ticket
+          sendResolved: true

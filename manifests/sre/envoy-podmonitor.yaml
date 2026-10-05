@@ -1,0 +1,24 @@
+# Scrapes the platform gateway's Envoy proxies: the source of the request-based
+# SLIs. Envoy exposes a few thousand series, almost all of which no SLO uses, so
+# only the families the SLOs and the dashboard read are kept.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-gateway-proxy
+  namespace: sre
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+  podMetricsEndpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 15s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: envoy_vhost_vcluster_upstream_rq_(xx|time_bucket|time_count)|envoy_http_downstream_rq_xx
+          action: keep

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: sre-apps
+description: Argo CD Applications for the SRE layer. Rendered by the "sre" Application in gitops-platform.
+type: application
+version: 0.1.0

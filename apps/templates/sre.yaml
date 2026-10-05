@@ -1,0 +1,22 @@
+# The SLO rules, the probe, the Envoy scrape config, alert routing and the
+# dashboard: everything in manifests/sre, built with kustomize.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sre
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.revision }}
+    path: manifests/sre
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sre
+  syncPolicy:
+    {{- include "sre.syncPolicy" . | nindent 4 }}

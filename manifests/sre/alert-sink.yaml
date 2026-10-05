@@ -1,0 +1,64 @@
+# Stands in for a pager and a ticket system: an HTTP server that logs every
+# request it receives. `kubectl logs -n sre deploy/alert-sink` shows each
+# notification Alertmanager delivered, with its full payload.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-sink
+  namespace: sre
+  labels:
+    app.kubernetes.io/name: alert-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alert-sink
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alert-sink
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: echo
+          image: mendhak/http-https-echo:42
+          env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: LOG_IGNORE_PATH
+              value: /healthz
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-sink
+  namespace: sre
+spec:
+  selector:
+    app.kubernetes.io/name: alert-sink
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

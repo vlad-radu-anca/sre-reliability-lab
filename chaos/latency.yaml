@@ -1,0 +1,23 @@
+# Scenario "latency": every response from podinfo in prod is delayed by 300 ms,
+# above the 250 ms the latency SLO allows. Uses tc netem inside the pods'
+# network namespace, so the delay is real network time that Envoy measures.
+#
+# Expected: PodinfoProdSlow pages. Availability and errors stay green, because
+# every request still succeeds.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: gameday-latency
+  namespace: podinfo-prod
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [podinfo-prod]
+    labelSelectors:
+      app.kubernetes.io/name: podinfo
+  delay:
+    latency: 300ms
+    jitter: 20ms
+  direction: to
+  duration: 20m

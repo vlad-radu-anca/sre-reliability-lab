@@ -1,0 +1,22 @@
+# Everything the "sre" Application syncs into the cluster.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - envoy-podmonitor.yaml
+  - podinfo-probe.yaml
+  - slo-rules/podinfo-prod.yaml
+  - alertmanager-config.yaml
+  - alert-sink.yaml
+
+# Grafana's dashboard sidecar loads any ConfigMap labelled grafana_dashboard,
+# from every namespace. The JSON stays a plain file so it can be edited, or
+# exported from Grafana, without touching YAML.
+configMapGenerator:
+  - name: dashboard-podinfo-slos
+    namespace: sre
+    files:
+      - dashboards/podinfo-slos.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

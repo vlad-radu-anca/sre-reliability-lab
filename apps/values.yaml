@@ -1,0 +1,9 @@
+# Git source for the manifests in this repository. gitops-platform overrides
+# revision with the commit under test when CI runs a game day for a pull
+# request, so the SLOs and alerts come from that commit, not from main.
+repoURL: https://github.com/vlad-radu-anca/sre-reliability-lab.git
+revision: main
+
+# Chaos Mesh is only needed for game days. Switch it off on a small machine.
+chaosMesh:
+  enabled: true

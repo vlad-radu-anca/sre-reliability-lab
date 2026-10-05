@@ -1,0 +1,86 @@
+name: game day
+
+# Deploys the full platform from gitops-platform on kind, with this repository's
+# SRE layer at the commit under test, then breaks things on purpose and checks
+# that the right alerts fire and the wrong ones do not.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      platform_ref:
+        description: gitops-platform branch or commit to deploy
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameday-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HELM_VERSION: v3.22.0
+  KIND_VERSION: v0.33.0
+  # root, 10 platform Applications, 3 podinfo environments, and the SRE layer:
+  # the parent "sre-apps" plus blackbox-exporter, chaos-mesh and sre.
+  MIN_APPS: "18"
+
+jobs:
+  gameday:
+    name: deploy and run game days
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out gitops-platform
+        uses: actions/checkout@v5
+        with:
+          repository: vlad-radu-anca/gitops-platform
+          ref: ${{ inputs.platform_ref || 'main' }}
+          path: platform
+
+      - name: Raise vm.max_map_count for Elasticsearch
+        run: sudo sysctl -w vm.max_map_count=262144
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kind
+        uses: helm/kind-action@v1.15.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          install_only: true
+
+      - name: Create the cluster
+        run: make -C platform cluster
+
+      - name: Install Argo CD
+        run: make -C platform argocd
+
+      - name: Deploy the platform, with the SRE layer at this commit
+        run: make -C platform root SRE_REVISION="${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Wait for every Application to be synced and healthy
+        run: make -C platform wait
+
+      # The control scenario runs first, while nothing is paging: after the
+      # others, their alerts stay active for up to 30 minutes, by design.
+      - name: "Game day: killing every pod is absorbed and pages nobody"
+        run: make gameday SCENARIO=pod-kill
+
+      - name: "Game day: gateway outage pages through the availability SLO"
+        run: make gameday SCENARIO=outage
+
+      - name: "Game day: injected latency pages through the latency SLO"
+        run: make gameday SCENARIO=latency
+
+      - name: Show Argo CD and alert state on failure
+        if: failure()
+        run: |
+          make -C platform status
+          kubectl get pods -A | grep -v Running || true
+          kubectl logs -n sre deploy/alert-sink --tail=50 || true

@@ -1,0 +1,80 @@
+# Steady user traffic for game days: a constant 10 requests per second to
+# podinfo in prod, through the gateway, for the length of the experiment.
+# Request-based SLIs need traffic to measure; without it, an outage looks like
+# a quiet afternoon.
+#
+# The job does not fail on errors: a game day expects them.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-load
+  namespace: sre
+data:
+  load.js: |
+    import http from 'k6/http';
+    import { check } from 'k6';
+
+    export const options = {
+      scenarios: {
+        steady: {
+          executor: 'constant-arrival-rate',
+          rate: Number(__ENV.RATE || 10),
+          timeUnit: '1s',
+          duration: __ENV.DURATION || '20m',
+          preAllocatedVUs: 20,
+          maxVUs: 100,
+        },
+      },
+    };
+
+    export default function () {
+      const res = http.get(__ENV.TARGET, { headers: { Host: __ENV.HOST }, timeout: '5s' });
+      check(res, { 'status is 200': (r) => r.status === 200 });
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-load
+  namespace: sre
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 12345
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: k6
+          image: grafana/k6:2.3.0
+          args: [run, --quiet, /scripts/load.js]
+          env:
+            - name: TARGET
+              value: http://platform-gateway.envoy-gateway-system.svc/
+            - name: HOST
+              value: podinfo-prod.localtest.me
+            - name: RATE
+              value: "10"
+            - name: DURATION
+              value: 20m
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: scripts
+          configMap:
+            name: k6-load

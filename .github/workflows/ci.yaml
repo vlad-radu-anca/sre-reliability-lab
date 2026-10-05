@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  slos:
+    name: slos (generate, promtool tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Regenerates the rules from slos/ and fails if they differ from the
+      # committed ones, then runs the alert unit tests against them.
+      - run: make check-generated
+      - run: make test
+
+  validate:
+    name: validate (kustomize, helm, kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make validate
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: shellcheck scripts/*.sh

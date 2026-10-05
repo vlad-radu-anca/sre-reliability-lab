@@ -1,0 +1,18 @@
+# Scenario "pod-kill": kill every podinfo pod in prod at once.
+#
+# Expected: no page. Kubernetes replaces the pods within seconds, and the few
+# requests that fail in between stay well inside the error budget. This is the
+# control experiment: it checks that the alerts do not fire for a disruption
+# the service absorbs on its own.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: gameday-pod-kill
+  namespace: podinfo-prod
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces: [podinfo-prod]
+    labelSelectors:
+      app.kubernetes.io/name: podinfo

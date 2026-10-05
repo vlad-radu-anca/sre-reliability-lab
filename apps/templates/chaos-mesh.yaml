@@ -1,0 +1,43 @@
+{{- if .Values.chaosMesh.enabled }}
+# Fault injection for game days. Installed, but idle until an experiment from
+# chaos/ is applied.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaos-mesh
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.chaos-mesh.org
+    chart: chaos-mesh
+    targetRevision: 2.8.4
+    helm:
+      releaseName: chaos-mesh
+      valuesObject:
+        # kind nodes run containerd, not Docker.
+        chaosDaemon:
+          runtime: containerd
+          socketPath: /run/containerd/containerd.sock
+        controllerManager:
+          replicaCount: 1
+        # Webhook certificates from the platform's cert-manager. The chart's
+        # default generates new ones on every render, which Argo CD would see
+        # as a permanent diff.
+        webhook:
+          certManager:
+            enabled: true
+        dashboard:
+          create: false
+        dnsServer:
+          create: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: chaos-mesh
+  syncPolicy:
+    {{- include "sre.syncPolicy" . | nindent 4 }}
+{{- end }}

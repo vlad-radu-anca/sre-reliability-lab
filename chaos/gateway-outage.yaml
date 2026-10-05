@@ -1,0 +1,24 @@
+# Scenario "outage": the gateway answers every request for podinfo in prod with
+# a 503 and never forwards it. Stands in for a broken route, a bad gateway
+# config or an empty backend, the failures that happen in front of the app.
+#
+# Expected: PodinfoProdUnavailable pages. PodinfoProdErrors stays silent: the
+# requests never reach podinfo, so Envoy's per-service counters never see them.
+# That blind spot is why the availability SLO is probe-based
+# (docs/decisions/0001-three-slis.md).
+#
+# Not a Chaos Mesh experiment: fault injection is built into the gateway.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: gameday-outage
+  namespace: podinfo-prod
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: podinfo
+  faultInjection:
+    abort:
+      httpStatus: 503
+      percentage: 100

@@ -1,0 +1,195 @@
+# Unit tests for the generated SLO alerts, run with `promtool test rules`.
+#
+# Each test feeds synthetic metrics into the real generated rules and asserts
+# which alerts fire. They pin down the behaviour the SLOs are meant to have: a
+# fast burn pages, a slow burn opens a ticket, and noise does neither.
+#
+# Series values use promtool's expanding notation: 'a+bxn' starts at a and adds
+# b, n times, one sample per interval.
+rule_files:
+  - ../build/rules/podinfo-prod.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # The gateway stops serving podinfo. Probes fail outright, so both the page
+  # (fast burn) and the ticket (slow burn) fire within minutes.
+  - name: outage pages
+    interval: 1m
+    input_series:
+      - series: probe_success{job="probe-podinfo-prod"}
+        values: 1x30 0x30
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PodinfoProdUnavailable
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: PodinfoProdUnavailable
+        exp_alerts:
+          - exp_labels: &availability_page
+              alertname: PodinfoProdUnavailable
+              environment: prod
+              owner: platform
+              severity: page
+              sloth_id: podinfo-availability
+              sloth_service: podinfo
+              sloth_severity: page
+              sloth_slo: availability
+            exp_annotations:
+              summary: podinfo in prod is failing synthetic checks through the gateway.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-availability.md
+              title: (page) podinfo availability SLO error budget burn rate is too fast.
+          - exp_labels:
+              alertname: PodinfoProdUnavailable
+              environment: prod
+              owner: platform
+              severity: ticket
+              sloth_id: podinfo-availability
+              sloth_service: podinfo
+              sloth_severity: ticket
+              sloth_slo: availability
+            exp_annotations:
+              summary: podinfo in prod is failing synthetic checks through the gateway.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-availability.md
+              title: (ticket) podinfo availability SLO error budget burn rate is too fast.
+
+  # One failed probe after six healthy hours is noise, not an incident. Neither
+  # alert may fire for it.
+  - name: a single failed probe is not an incident
+    interval: 1m
+    input_series:
+      - series: probe_success{job="probe-podinfo-prod"}
+        values: 1x360 0 1x60
+    alert_rule_test:
+      - eval_time: 363m
+        alertname: PodinfoProdUnavailable
+        exp_alerts: []
+      - eval_time: 420m
+        alertname: PodinfoProdUnavailable
+        exp_alerts: []
+
+  # A bad release: 20% of requests fail after half an hour of clean traffic,
+  # at 10 requests per second. The 30m/6h window pair catches it first.
+  - name: a burst of server errors pages
+    interval: 1m
+    input_series:
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="2"}
+        values: 0+600x30 18000+480x30
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="5"}
+        values: 0x30 0+120x30
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PodinfoProdErrors
+        exp_alerts: []
+      - eval_time: 45m
+        alertname: PodinfoProdErrors
+        exp_alerts:
+          - exp_labels:
+              alertname: PodinfoProdErrors
+              environment: prod
+              owner: platform
+              severity: page
+              sloth_id: podinfo-errors
+              sloth_service: podinfo
+              sloth_severity: page
+              sloth_slo: errors
+            exp_annotations:
+              summary: podinfo in prod is returning server errors.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-errors.md
+              title: (page) podinfo errors SLO error budget burn rate is too fast.
+          - exp_labels:
+              alertname: PodinfoProdErrors
+              environment: prod
+              owner: platform
+              severity: ticket
+              sloth_id: podinfo-errors
+              sloth_service: podinfo
+              sloth_severity: ticket
+              sloth_slo: errors
+            exp_annotations:
+              summary: podinfo in prod is returning server errors.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-errors.md
+              title: (ticket) podinfo errors SLO error budget burn rate is too fast.
+
+  # 2% errors, steadily, for three hours. That spends the monthly budget in
+  # about a week: worth a ticket, not worth waking anyone up.
+  - name: a slow burn opens a ticket but does not page
+    interval: 1m
+    input_series:
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="2"}
+        values: 0+588x180
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="5"}
+        values: 0+12x180
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: PodinfoProdErrors
+        exp_alerts:
+          - exp_labels:
+              alertname: PodinfoProdErrors
+              environment: prod
+              owner: platform
+              severity: ticket
+              sloth_id: podinfo-errors
+              sloth_service: podinfo
+              sloth_severity: ticket
+              sloth_slo: errors
+            exp_annotations:
+              summary: podinfo in prod is returning server errors.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-errors.md
+              title: (ticket) podinfo errors SLO error budget burn rate is too fast.
+
+  # 0.1% errors is within a 99.5% objective. Nothing should fire.
+  - name: errors within budget stay quiet
+    interval: 1m
+    input_series:
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="2"}
+        values: 0+599.4x180
+      - series: envoy_vhost_vcluster_upstream_rq_xx{envoy_virtual_cluster="podinfo-prod_localtest_me",envoy_response_code_class="5"}
+        values: 0+0.6x180
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: PodinfoProdErrors
+        exp_alerts: []
+
+  # Every request becomes slower than 250 ms: the histogram's 250 ms bucket
+  # stops growing while the total keeps counting.
+  - name: slow responses page
+    interval: 1m
+    input_series:
+      - series: envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}
+        values: 0+600x60
+      - series: envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}
+        values: 0+600x30 18000x30
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PodinfoProdSlow
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: PodinfoProdSlow
+        exp_alerts:
+          - exp_labels:
+              alertname: PodinfoProdSlow
+              environment: prod
+              owner: platform
+              severity: page
+              sloth_id: podinfo-latency
+              sloth_service: podinfo
+              sloth_severity: page
+              sloth_slo: latency
+            exp_annotations:
+              summary: podinfo in prod is responding slowly.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-latency.md
+              title: (page) podinfo latency SLO error budget burn rate is too fast.
+          - exp_labels:
+              alertname: PodinfoProdSlow
+              environment: prod
+              owner: platform
+              severity: ticket
+              sloth_id: podinfo-latency
+              sloth_service: podinfo
+              sloth_severity: ticket
+              sloth_slo: latency
+            exp_annotations:
+              summary: podinfo in prod is responding slowly.
+              runbook_url: https://github.com/vlad-radu-anca/sre-reliability-lab/blob/main/runbooks/podinfo-latency.md
+              title: (ticket) podinfo latency SLO error budget burn rate is too fast.

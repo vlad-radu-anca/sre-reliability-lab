@@ -1,0 +1,20 @@
+# Synthetic check for the availability SLO: every 10 seconds, request podinfo
+# in prod through the gateway, exactly as a user would. The blackbox exporter
+# module sets the Host header, so the request takes the same route as real
+# traffic and fails the same way when the gateway cannot serve it.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: podinfo-prod
+  namespace: sre
+spec:
+  jobName: probe-podinfo-prod
+  interval: 10s
+  scrapeTimeout: 5s
+  module: podinfo_prod
+  prober:
+    url: blackbox-exporter.sre.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - http://platform-gateway.envoy-gateway-system.svc/
