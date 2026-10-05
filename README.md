@@ -56,6 +56,8 @@ The short window in each pair makes an alert resolve quickly once a problem is f
 
 The first run of these tests caught a real bug: the probe SLI carried the probe's own labels into the alerts, which would have produced one page per probe target.
 
+Unit tests only check the rules against data shaped the way the test author expects, though, and the first game day in CI caught what they could not: **the latency SLO could never fire.** Envoy exposes its 250 ms histogram bucket as `le="250"`, but Prometheus 3 normalises bucket bounds on ingestion and stores it as `le="250.0"`. The SLI matched no series, evaluated to no data, and an alert on no data stays silent. The test data had made the same assumption as the rule. Both now use the stored form, and the test comment records why.
+
 **Game days** ([scripts/gameday.sh](scripts/gameday.sh)) run against the deployed platform: steady load with k6, a clean baseline, then a fault, then assertions on Alertmanager itself, including that the page reached the receiver.
 
 | Scenario | Fault | Must page | Must stay silent |

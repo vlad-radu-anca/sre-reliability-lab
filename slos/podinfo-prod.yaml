@@ -67,11 +67,14 @@ spec:
       sli:
         events:
           # Envoy's latency histogram is in milliseconds. Slow requests are all
-          # requests minus those in the 250 ms bucket.
+          # requests minus those in the 250 ms bucket. Envoy exposes that bucket
+          # as le="250", but Prometheus 3 normalises bucket bounds to floats on
+          # ingestion and stores it as le="250.0": matching "250" finds nothing,
+          # and an SLI with no data never alerts.
           errorQuery: |
             sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[{{.window}}]))
             -
-            sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[{{.window}}]))
+            sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[{{.window}}]))
           totalQuery: sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[{{.window}}]))
       alerting:
         name: PodinfoProdSlow

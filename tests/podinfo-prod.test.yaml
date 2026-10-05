@@ -152,13 +152,16 @@ tests:
         exp_alerts: []
 
   # Every request becomes slower than 250 ms: the histogram's 250 ms bucket
-  # stops growing while the total keeps counting.
+  # stops growing while the total keeps counting. The bucket is written as
+  # le="250.0", the way Prometheus 3 stores it, not as Envoy exposes it: test
+  # data that mirrored the exporter instead of the database once hid a latency
+  # SLO that could never fire.
   - name: slow responses page
     interval: 1m
     input_series:
       - series: envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}
         values: 0+600x60
-      - series: envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}
+      - series: envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}
         values: 0+600x30 18000x30
     alert_rule_test:
       - eval_time: 30m

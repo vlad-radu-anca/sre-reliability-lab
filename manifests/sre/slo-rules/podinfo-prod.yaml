@@ -433,7 +433,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[5m]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[5m]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[5m]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[5m])))
@@ -448,7 +448,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[30m]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[30m]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[30m]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[30m])))
@@ -463,7 +463,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[1h]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[1h]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[1h]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[1h])))
@@ -478,7 +478,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[2h]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[2h]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[2h]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[2h])))
@@ -493,7 +493,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[6h]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[6h]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[6h]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[6h])))
@@ -508,7 +508,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[1d]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[1d]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[1d]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[1d])))
@@ -523,7 +523,7 @@ spec:
     - expr: |
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[3d]))
         -
-        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250"}[3d]))
+        sum(rate(envoy_vhost_vcluster_upstream_rq_time_bucket{envoy_virtual_cluster="podinfo-prod_localtest_me",le="250.0"}[3d]))
         )
         /
         (sum(rate(envoy_vhost_vcluster_upstream_rq_time_count{envoy_virtual_cluster="podinfo-prod_localtest_me"}[3d])))
