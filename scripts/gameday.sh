@@ -22,16 +22,19 @@ AM_PORT="${AM_PORT:-19093}"
 case "$SCENARIO" in
   latency)
     FAULT=chaos/latency.yaml
+    CHAOS=networkchaos/gameday-latency
     EXPECT_PAGE=PodinfoProdSlow
     EXPECT_SILENT="PodinfoProdUnavailable PodinfoProdErrors" ;;
   outage)
     FAULT=chaos/gateway-outage.yaml
+    CHAOS=""
     EXPECT_PAGE=PodinfoProdUnavailable
     # The gateway answers these requests itself, so the request-based SLO is
     # blind to them. Asserting it stays silent documents that blind spot.
     EXPECT_SILENT="PodinfoProdErrors" ;;
   pod-kill)
     FAULT=chaos/pod-kill.yaml
+    CHAOS=podchaos/gameday-pod-kill
     EXPECT_PAGE=""
     EXPECT_SILENT="PodinfoProdUnavailable PodinfoProdErrors PodinfoProdSlow" ;;
   *)
@@ -95,6 +98,21 @@ sleep "$BASELINE"
 
 log "injecting the fault: $FAULT"
 kubectl apply -f "$FAULT" >/dev/null
+
+# A fault that silently fails to apply would look exactly like alerting that
+# does not work. Chaos Mesh reports whether it reached every target, so check
+# that first and fail with its reason, rather than waiting for a page that
+# cannot come.
+if [[ -n "$CHAOS" ]]; then
+  if ! kubectl wait -n podinfo-prod "$CHAOS" --for=condition=AllInjected --timeout=90s >/dev/null; then
+    log "FAIL: Chaos Mesh did not inject the fault, so this run says nothing about alerting"
+    kubectl describe -n podinfo-prod "$CHAOS" | sed -n '/Events:/,$p'
+    kubectl logs -n chaos-mesh -l app.kubernetes.io/component=chaos-daemon --since=5m --tail=200 |
+      grep -iE 'error|fail' | tail -10 || true
+    exit 1
+  fi
+  log "fault injected into every target"
+fi
 started=$(date +%s)
 
 result=pass

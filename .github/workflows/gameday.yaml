@@ -48,6 +48,18 @@ jobs:
       - name: Raise vm.max_map_count for Elasticsearch
         run: sudo sysctl -w vm.max_map_count=262144
 
+      # Chaos Mesh injects latency with tc netem, which needs the sch_netem
+      # kernel module on the host: kind nodes share the runner's kernel. The
+      # runners' Azure kernel ships it in the extra modules package.
+      - name: Load the netem kernel module for latency experiments
+        run: |
+          sudo modprobe sch_netem || {
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)"
+            sudo modprobe sch_netem
+          }
+          lsmod | grep sch_netem
+
       - uses: azure/setup-helm@v5.0.1
         with:
           version: ${{ env.HELM_VERSION }}
