@@ -45,7 +45,9 @@ PF_PID=""
 cleanup() {
   kubectl delete -f "$FAULT" --ignore-not-found --wait=false >/dev/null 2>&1 || true
   kubectl delete -f load/k6.yaml --ignore-not-found --wait=false >/dev/null 2>&1 || true
-  [[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null || true
+  if [[ -n "$PF_PID" ]]; then
+    kill "$PF_PID" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
